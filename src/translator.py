@@ -18,9 +18,9 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=os.getenv("HF_TOKEN"))
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, token=os.getenv("HF_TOKEN"))
 
 def translate_message(text: str, source_lang: str, target_lang: str) -> str:
-    """Translates incoming/outgoing customer messages and logs metrics to Langfuse."""
+    """Translates incoming/outgoing customer messages across multiple languages and logs metrics to Langfuse."""
     trace = langfuse.trace(
-        name="customer_support_translation",
+        name="multilingual_support_translation",
         metadata={
             "source_lang": source_lang,
             "target_lang": target_lang
@@ -28,17 +28,20 @@ def translate_message(text: str, source_lang: str, target_lang: str) -> str:
     )
     
     try:
+        # Set the source language explicitly for NLLB tokenizer
+        tokenizer.src_lang = source_lang
         inputs = tokenizer(text, return_tensors="pt")
         target_lang_id = tokenizer.lang_code_to_id.get(target_lang)
         
         translated_tokens = model.generate(
             **inputs, 
-            forced_bos_token_id=target_lang_id
+            forced_bos_token_id=target_lang_id,
+            max_length=128
         )
         translated_text = tokenizer.decode(translated_tokens[0], skip_special_tokens=True)
         
         trace.generation(
-            name="nllb_translation_step",
+            name="nllb_multilingual_step",
             model=MODEL_ID,
             input=text,
             output=translated_text,
